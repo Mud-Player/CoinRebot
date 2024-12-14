@@ -10,7 +10,7 @@ if __name__ == "__main__":
     app.setApplicationName("BitgetBot")
 
     widget = MainWindow()
-    widget.resize(800, 600)
+    widget.resize(1080, 720)
     widget.show()
 
     sys.exit(app.exec())

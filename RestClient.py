@@ -23,7 +23,7 @@ class RestClient(QObject):
         self.API_KEY = api_key if api_key is not None else Configurations.apikey()
         self.SECRET_KEY = secret_key if secret_key is not None else Configurations.secretkey()
         self.PASSPHRASE = passphrase if passphrase is not None else Configurations.passphrase()
-        self.http_manager = QNetworkAccessManager()
+        self.http_manager = QNetworkAccessManager(self)
 
     @property
     def rectified_timestamp(self):
@@ -89,110 +89,3 @@ class RestClient(QObject):
             return
         info = json_data['data'][0]
         self.symbol_info_updated.emit(info)
-
-class PlaceOrder(RestClient):
-    succeed = Signal()
-    failed = Signal()
-
-    def __init__(self, symbol:str, price:str, quantity:str, interval = 1, trigger_datetime:QDateTime = QDateTime(),
-                 api_key=None, secret_key=None, passphrase=None):
-        super().__init__(api_key, secret_key, passphrase)
-        self.orders = list()
-        self.params = None
-        self.symbol = symbol
-        self.price = price
-        self.quantity = quantity
-        self.interval = interval
-        self.trigger_datetime = trigger_datetime
-
-        self.succeed_count = 0
-        self.failed_count = 0
-        self.error_messages = []
-
-        self.request_timer = QTimer(self)
-        self.request_timer.setInterval(interval)
-        self.request_timer.timeout.connect(self._on_request_order)
-        self.observe_timer = QTimer(self)   # in case of system time drifting
-        self.observe_timer.timeout.connect(self._on_check_time)
-        self.observe_timer.setSingleShot(True)
-
-    def start(self):
-        if self.params is not None:
-            raise Exception('Do not place order over than two times with one instance.')
-        params = dict()
-        params['symbol'] = self.symbol
-        params['side'] = 'buy'
-        params['orderType'] = 'limit'
-        params['force'] = 'gtc'
-        params['price'] = self.price
-        params['size'] = self.quantity
-        self.params = params
-
-        if self.trigger_datetime.isValid():
-            delta_ms = self.trigger_datetime.toMSecsSinceEpoch() - self.rectified_timestamp
-            if delta_ms < 0:
-                qWarning(f'Error timer: {self.trigger_datetime.toString()}')
-                return False
-            self._on_check_time()
-        else:   # start immediately
-            self.trigger_datetime=QDateTime.currentDateTime()
-            self._on_request_order()
-            self.request_timer.start()
-        return True
-
-
-    def stop(self):
-        self.request_timer.stop()
-        self.observe_timer.stop()
-
-    def is_started(self):
-        return self.params is not None
-
-    def is_running(self):
-        return self.request_timer.isActive()
-
-    def is_finished(self):
-        return (self.failed_count + self.succeed_count) > 0 and not self.request_timer.isActive()
-
-    def countdown_ms(self):
-        delta_ms = self.trigger_datetime.toMSecsSinceEpoch() - self.rectified_timestamp - self.delay_ms
-        return delta_ms
-
-    def _on_check_time(self):
-        delta_ms = self.countdown_ms()
-
-        if delta_ms < 1000:    # trigger
-            self._on_request_order()
-            self.request_timer.start()
-            qDebug(f'开始执行下单: {str(self.params)}')
-        elif delta_ms < 300_000:   # 5min
-            self.observe_timer.setInterval(delta_ms)
-            self.observe_timer.start()
-        else:   # > 5min
-            check_time = delta_ms / 3 * 2
-            self.observe_timer.setInterval(check_time)
-            self.observe_timer.start()
-
-
-    def _on_request_order(self):
-        minimum_timestamp = self.trigger_datetime.toMSecsSinceEpoch()
-        reply = self.request('/api/v2/spot/trade/place-order', self.params, minimum_timestamp)
-        reply.finished.connect(lambda: self._on_replied(reply))
-
-    @Slot(QNetworkReply)
-    def _on_replied(self, reply):
-        data = reply.readAll().data()
-        json_data = json.loads(data)
-        code = json_data['code']
-        if code == '00000':    # success
-            order_id = json_data['data']['orderId']
-            self.orders.append(int(order_id))
-            self.succeed_count += 1
-            self.request_timer.stop()
-            self.succeed.emit()
-            qDebug(f'下单成功: {str(self.params)}，累计成功下单{self.succeed_count}次')
-        else:   # error
-            self.failed_count += 1
-            self.failed.emit()
-            self.error_messages.append(json_data['msg'])
-            qDebug(str(json_data))

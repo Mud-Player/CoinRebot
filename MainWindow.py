@@ -5,8 +5,8 @@ from PySide6.QtCore import Qt, QtMsgType, qInstallMessageHandler, QDateTime
 from PySide6.QtWidgets import QGridLayout, QPushButton, QTextBrowser
 
 import MiscSettings
-from PlaceOrder import PlaceOrderWidget
-from StatusView import StatusView
+from PlaceOrderEdit import PlaceOrderWidget
+from OrderTable import OrderTableView
 from TimeStatus import UTCTimeWidget
 
 log_window: Union[QTextBrowser, None] = None
@@ -39,12 +39,15 @@ class MainWindow(QtWidgets.QWidget):
         layout.addWidget(place_order, 1, 0, 1, 1)
 
         # status view
-        status_view = StatusView()
+        status_view = OrderTableView()
         layout.addWidget(status_view, 1, 1, 1, 1)
 
         # log
         log = QTextBrowser()
         layout.addWidget(log, 2, 0, 1, 2)
+
+        layout.setColumnStretch(0, 0)
+        layout.setColumnStretch(1, 1)
 
         # misc configuration
         self.misc = MiscSettings.MiscSettingWidget(self)
