@@ -1,36 +1,13 @@
-from PySide6.QtCore import QObject, QJsonDocument, QDateTime, Qt, Signal, Slot, QTimer, qWarning, qDebug
+import json
+
+from PySide6.QtCore import QObject, QDateTime, Signal, Slot, QTimer, qWarning, qDebug
 from PySide6.QtNetwork import QNetworkReply, QNetworkAccessManager, QNetworkRequest
 
+import consts as c
 import utils
 from MiscSettings import Configurations
 from utils import get_timestamp
-import  json
 
-# Base Url
-API_URL = 'https://api.bitget.com'
-CONTRACT_WS_URL = 'wss://ws.bitget.com/mix/v1/stream'
-SERVER_TIMESTAMP_URL = '/api/v2/public/time'
-SYMBOL_INFO_URL = '/api/v2/spot/public/symbols'
-# http header
-CONTENT_TYPE = 'Content-Type'
-OK_ACCESS_KEY = 'ACCESS-KEY'
-OK_ACCESS_SIGN = 'ACCESS-SIGN'
-OK_ACCESS_TIMESTAMP = 'ACCESS-TIMESTAMP'
-OK_ACCESS_PASSPHRASE = 'ACCESS-PASSPHRASE'
-APPLICATION_JSON = 'application/json'
-
-# header key
-LOCALE = 'locale'
-
-# method
-GET = "GET"
-POST = "POST"
-DELETE = "DELETE"
-
-# sign type
-RSA = "RSA"
-SHA256 = "SHA256"
-SIGN_TYPE = SHA256
 
 class RestClient(QObject):
     delay_ms = 0
@@ -54,7 +31,7 @@ class RestClient(QObject):
         return timestamp
 
     def request(self, api_path, params, minimum_timestamp = None):
-        url = API_URL + api_path
+        url = c.API_URL + api_path
 
         timestamp = self.rectified_timestamp
         if minimum_timestamp is not None:
@@ -63,7 +40,7 @@ class RestClient(QObject):
         # sign & header
         body = json.dumps(params)
         sign = utils.sign(utils.pre_hash(timestamp, 'POST', api_path, str(body)), self.SECRET_KEY)
-        if SIGN_TYPE == RSA:
+        if c.SIGN_TYPE == c.RSA:
             sign = utils.signByRSA(utils.pre_hash(timestamp, 'POST', api_path, str(body)), self.SECRET_KEY)
         headers = utils.get_header(self.API_KEY, sign, timestamp, self.PASSPHRASE)
 
@@ -74,13 +51,13 @@ class RestClient(QObject):
         return reply
 
     def request_utctime(self):
-        request = QNetworkRequest(API_URL + SERVER_TIMESTAMP_URL)
+        request = QNetworkRequest(c.API_URL + c.SERVER_TIMESTAMP_URL)
         begin_ms = get_timestamp()
         reply = self.http_manager.get(request)
         reply.finished.connect(lambda : self._on_utc_replied(reply, begin_ms))
 
     def request_symbol(self, symbol):
-        url = API_URL + SYMBOL_INFO_URL + f'?symbol={symbol}'
+        url = c.API_URL + c.SYMBOL_INFO_URL + f'?symbol={symbol}'
         request = QNetworkRequest(url)
         reply = self.http_manager.get(request)
         reply.finished.connect(lambda : self._on_symbol_info_replied(reply))
@@ -139,7 +116,7 @@ class PlaceOrder(RestClient):
         self.observe_timer.timeout.connect(self._on_check_time)
         self.observe_timer.setSingleShot(True)
 
-    def place_order(self):
+    def start(self):
         if self.params is not None:
             raise Exception('Do not place order over than two times with one instance.')
         params = dict()

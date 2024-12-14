@@ -1,9 +1,9 @@
-import sys
-
-import PySide6.QtAsyncio as QtAsyncio
 from PySide6 import QtWidgets
 
 from MainWindow import MainWindow
+
+import sys
+
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication([])
