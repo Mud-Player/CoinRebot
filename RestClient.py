@@ -10,6 +10,7 @@ import  json
 API_URL = 'https://api.bitget.com'
 CONTRACT_WS_URL = 'wss://ws.bitget.com/mix/v1/stream'
 SERVER_TIMESTAMP_URL = '/api/v2/public/time'
+SYMBOL_INFO_URL = '/api/v2/spot/public/symbols'
 # http header
 CONTENT_TYPE = 'Content-Type'
 OK_ACCESS_KEY = 'ACCESS-KEY'
@@ -34,6 +35,9 @@ SIGN_TYPE = SHA256
 class RestClient(QObject):
     delay_ms = 0
     server_time_updated = Signal()
+    symbol_info_updated = Signal(dict)
+    symbol_info_not_existed = Signal()
+
     server_timestamp_base = 0
     local_timestamp_base = 0
 
@@ -69,12 +73,17 @@ class RestClient(QObject):
         reply = self.http_manager.post(request, body.encode())
         return reply
 
-
     def request_utctime(self):
         request = QNetworkRequest(API_URL + SERVER_TIMESTAMP_URL)
         begin_ms = get_timestamp()
         reply = self.http_manager.get(request)
         reply.finished.connect(lambda : self._on_utc_replied(reply, begin_ms))
+
+    def request_symbol(self, symbol):
+        url = API_URL + SYMBOL_INFO_URL + f'?symbol={symbol}'
+        request = QNetworkRequest(url)
+        reply = self.http_manager.get(request)
+        reply.finished.connect(lambda : self._on_symbol_info_replied(reply))
 
     def _on_utc_replied(self, reply: QNetworkReply, begin_ms):
         end_ms = get_timestamp()
@@ -93,6 +102,17 @@ class RestClient(QObject):
 
         self.server_time_updated.emit()
 
+    def _on_symbol_info_replied(self, reply: QNetworkReply):
+        data = reply.readAll().data()
+        json_data = json.loads(data.decode('utf-8'))
+        code = json_data['code']
+        if code != '00000':
+            if code == '40034':
+                self.symbol_info_not_existed.emit()
+            return
+        info = json_data['data'][0]
+        self.symbol_info_updated.emit(info)
+
 class PlaceOrder(RestClient):
     succeed = Signal()
     failed = Signal()
@@ -110,7 +130,7 @@ class PlaceOrder(RestClient):
 
         self.succeed_count = 0
         self.failed_count = 0
-        self.error_codes = []
+        self.error_messages = []
 
         self.request_timer = QTimer(self)
         self.request_timer.setInterval(interval)
@@ -197,5 +217,5 @@ class PlaceOrder(RestClient):
         else:   # error
             self.failed_count += 1
             self.failed.emit()
-            self.error_codes.append(int(code))
-            qDebug(json_data)
+            self.error_messages.append(json_data['msg'])
+            qDebug(str(json_data))

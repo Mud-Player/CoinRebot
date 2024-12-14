@@ -1,5 +1,6 @@
 from PySide6 import QtWidgets
 from PySide6.QtCore import QSettings
+from PySide6.QtNetwork import QNetworkProxy
 from PySide6.QtWidgets import QLabel, QLineEdit, QSpacerItem, QRadioButton, QPushButton
 
 
@@ -38,7 +39,7 @@ class Configurations:
 
     @staticmethod
     def use_proxy():
-        return bool(Configurations.settings.value("use_proxy", False))
+        return bool(Configurations.settings.value("use_proxy", False, type=bool))
 
     @staticmethod
     def set_use_proxy(value):
@@ -53,11 +54,12 @@ class Configurations:
         Configurations.settings.setValue("proxy_ip", value)
 
     @staticmethod
-    def proxy_port():
-        return str(Configurations.settings.value("proxy_port", "1080"))
+    def proxy_port() -> int:
+        value = Configurations.settings.value("proxy_port", defaultValue=1080, type=int)
+        return value
 
     @staticmethod
-    def set_proxy_port(value):
+    def set_proxy_port(value: int):
         Configurations.settings.setValue("proxy_port", value)
 
 
@@ -86,17 +88,17 @@ class MiscSettingWidget(QtWidgets.QDialog):
         layout.addItem(QSpacerItem(20, 20), 3, 0)
 
         # proxy on/of
-        proxy_switch = QRadioButton("VPN代理")
-        self.proxy_switch = proxy_switch
+        self.proxy_switch = QRadioButton("VPN代理")
+        self.proxy_switch.setChecked(Configurations.use_proxy())
         layout.addWidget(self.proxy_switch, 4, 0)
 
         # proxy_http
         layout.addWidget(QLabel("IP"), 5, 0)
         layout.addWidget(QLabel("Port"), 5, 1)
         proxy_http = QLineEdit(Configurations.proxy_ip())
-        proxy_port = QLineEdit(Configurations.proxy_port())
-        self.proxy_http = proxy_http
-        layout.addWidget(self.proxy_http, 6, 0)
+        proxy_port = QLineEdit(str(Configurations.proxy_port()))
+        self.proxy_ip = proxy_http
+        layout.addWidget(self.proxy_ip, 6, 0)
         self.proxy_port = proxy_port
         layout.addWidget(self.proxy_port, 6, 1)
 
@@ -107,11 +109,24 @@ class MiscSettingWidget(QtWidgets.QDialog):
 
         self.accepted.connect(self._apply_settings)
 
+        # init
+        self._apply_proxy()
+
     def _apply_settings(self):
         Configurations.set_apikey(self.api_key.text())
         Configurations.set_secretkey(self.secret_key.text())
         Configurations.set_passphrase(self.passphrase.text())
         Configurations.set_use_proxy(self.proxy_switch.isChecked())
-        Configurations.set_proxy_ip(self.proxy_port)
-        Configurations.set_proxy_port(self.proxy_port)
+        Configurations.set_proxy_ip(self.proxy_ip.text())
+        Configurations.set_proxy_port(int(self.proxy_port.text()))
+        self._apply_proxy()
+
+    def _apply_proxy(self):
+        if Configurations.use_proxy():
+            proxy = QNetworkProxy(QNetworkProxy.ProxyType.HttpProxy,
+                                  Configurations.proxy_ip(), Configurations.proxy_port())
+            QNetworkProxy.setApplicationProxy(proxy)
+        else:
+            proxy = QNetworkProxy(QNetworkProxy.ProxyType.NoProxy)
+            QNetworkProxy.setApplicationProxy(proxy)
 
