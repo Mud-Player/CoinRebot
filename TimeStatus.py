@@ -1,9 +1,8 @@
 from PySide6 import QtWidgets
 from PySide6.QtCore import QTimer, Slot, QDateTime
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QSpacerItem, QSizePolicy
-from PySide6.QtCore import Qt
 
-from RestClient import RestClient
+from BitgetAPI.BitgetRest import BitgetCommon
 
 
 class UTCTimeWidget(QtWidgets.QWidget):
@@ -20,7 +19,7 @@ class UTCTimeWidget(QtWidgets.QWidget):
 
         layout.addItem(QSpacerItem(20, 20, hData=QSizePolicy.Policy.Expanding))
 
-        self.time_client = RestClient()
+        self.time_client = BitgetCommon()
         self.time_client.server_time_updated.connect(self.on_utc_updated)
         timer = QTimer(self)
         timer.timeout.connect(self.time_client.request_utctime)

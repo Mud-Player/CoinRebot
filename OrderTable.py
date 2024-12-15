@@ -1,5 +1,5 @@
 from PySide6 import QtWidgets
-from PySide6.QtCore import Slot, QTime, QTimer, Qt
+from PySide6.QtCore import Slot, QTime, QTimer, Qt, QDateTime
 from PySide6.QtWidgets import QVBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QMenu
 
 import OrdersDB
@@ -64,27 +64,27 @@ class OrderTableView(QtWidgets.QWidget):
         timer.timeout.connect(self._update_all_order_item)
         timer.start()
 
-    @Slot(OrdersDB.PlaceOrder)
-    def _on_buy_order_added(self, order: OrdersDB.PlaceOrder):
+    @Slot(OrdersDB.BitgetOrder)
+    def _on_buy_order_added(self, order: OrdersDB.BitgetOrder):
         self._on_order_added(self.buy_table, order)
 
-    @Slot(OrdersDB.PlaceOrder)
-    def _on_sell_order_added(self, order: OrdersDB.PlaceOrder):
+    @Slot(OrdersDB.BitgetOrder)
+    def _on_sell_order_added(self, order: OrdersDB.BitgetOrder):
         self._on_order_added(self.sell_table, order)
 
-    @Slot(OrdersDB.PlaceOrder)
-    def _on_buy_order_removed(self, order: OrdersDB.PlaceOrder):
+    @Slot(OrdersDB.BitgetOrder)
+    def _on_buy_order_removed(self, order: OrdersDB.BitgetOrder):
         self._on_order_removed_by_idx(self.buy_table, self.buy_orders.index(order))
 
-    @Slot(OrdersDB.PlaceOrder)
-    def _on_sell_order_removed(self, order: OrdersDB.PlaceOrder):
+    @Slot(OrdersDB.BitgetOrder)
+    def _on_sell_order_removed(self, order: OrdersDB.BitgetOrder):
         self._on_order_removed_by_idx(self.sell_table, self.sell_orders.index(order))
 
     def _on_order_added(self, table, order):
         symbol = QTableWidgetItem(order.symbol)
         price = QTableWidgetItem(order.price)
         quantity = QTableWidgetItem(order.quantity)
-        time = QTableWidgetItem(order.trigger_datetime.toString("yyyy.MM.dd hh:mm:ss"))
+        time = QTableWidgetItem(QDateTime.fromMSecsSinceEpoch(order.trigger_timestamp).toString("yyyy.MM.dd hh:mm:ss"))
         countdown = QTableWidgetItem()
         status = QTableWidgetItem()
         result = QTableWidgetItem()
@@ -120,10 +120,8 @@ class OrderTableView(QtWidgets.QWidget):
             status.setText('完成')
         elif order.is_running():
             status.setText('执行中')
-        elif order.is_started():
-            status.setText('等待')
         else:
-            status.setText('unknown')
+            status.setText('等待')
 
         result = table.item(idx, 6)
         succeed = order.succeed_count

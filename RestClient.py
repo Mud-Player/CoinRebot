@@ -1,91 +1,118 @@
-import json
+from abc import abstractmethod, ABCMeta
+from enum import Enum
 
-from PySide6.QtCore import QObject, QDateTime, Signal, Slot, QTimer, qWarning, qDebug
-from PySide6.QtNetwork import QNetworkReply, QNetworkAccessManager, QNetworkRequest
-
-import consts as c
-import utils
-from MiscSettings import Configurations
-from utils import get_timestamp
+from PySide6.QtCore import QObject, Signal, QTimer, QDateTime
+from PySide6.QtNetwork import QNetworkAccessManager
 
 
-class RestClient(QObject):
-    delay_ms = 0
+class MetaQObjectABC(type(QObject), ABCMeta):
+    pass
+
+class RestBase(QObject, metaclass=MetaQObjectABC):
     server_time_updated = Signal()
     symbol_info_updated = Signal(dict)
     symbol_info_not_existed = Signal()
-
-    server_timestamp_base = 0
-    local_timestamp_base = 0
-
-    def __init__(self, api_key=None, secret_key=None, passphrase=None):
+    
+    def __init__(self):
         super().__init__()
-        self.API_KEY = api_key if api_key is not None else Configurations.apikey()
-        self.SECRET_KEY = secret_key if secret_key is not None else Configurations.secretkey()
-        self.PASSPHRASE = passphrase if passphrase is not None else Configurations.passphrase()
-        self.http_manager = QNetworkAccessManager(self)
 
     @property
+    @abstractmethod
     def rectified_timestamp(self):
-        timestamp = self.server_timestamp_base + (get_timestamp() - self.local_timestamp_base)
-        return timestamp
+        pass
+    
+    @property
+    @abstractmethod
+    def delay_ms(self):
+        pass
 
-    def request(self, api_path, params, minimum_timestamp = None):
-        url = c.API_URL + api_path
-
-        timestamp = self.rectified_timestamp
-        if minimum_timestamp is not None:
-            timestamp = max(timestamp, minimum_timestamp)
-
-        # sign & header
-        body = json.dumps(params)
-        sign = utils.sign(utils.pre_hash(timestamp, 'POST', api_path, str(body)), self.SECRET_KEY)
-        if c.SIGN_TYPE == c.RSA:
-            sign = utils.signByRSA(utils.pre_hash(timestamp, 'POST', api_path, str(body)), self.SECRET_KEY)
-        headers = utils.get_header(self.API_KEY, sign, timestamp, self.PASSPHRASE)
-
-        request = QNetworkRequest(url)
-        for key, value in headers.items():
-            request.setRawHeader(key.encode(), value.encode())  # `encode()` 将字符串转换为字节
-        reply = self.http_manager.post(request, body.encode())
-        return reply
-
+    @abstractmethod
     def request_utctime(self):
-        request = QNetworkRequest(c.API_URL + c.SERVER_TIMESTAMP_URL)
-        begin_ms = get_timestamp()
-        reply = self.http_manager.get(request)
-        reply.finished.connect(lambda : self._on_utc_replied(reply, begin_ms))
+        pass
 
+    @abstractmethod
     def request_symbol(self, symbol):
-        url = c.API_URL + c.SYMBOL_INFO_URL + f'?symbol={symbol}'
-        request = QNetworkRequest(url)
-        reply = self.http_manager.get(request)
-        reply.finished.connect(lambda : self._on_symbol_info_replied(reply))
+        pass
+    
 
-    def _on_utc_replied(self, reply: QNetworkReply, begin_ms):
-        end_ms = get_timestamp()
-        delta_ms = (end_ms - begin_ms) // 2
-        self.local_timestamp_base = end_ms
+class RestOrderBase(RestBase):
+    succeed = Signal()
+    failed = Signal()
 
-        # predict delay
-        delay = int(0.4 * self.delay_ms + 0.6 * delta_ms)
-        self.delay_ms = delay
+    class OrderType(Enum):
+        Buy = 1
+        Sell = 2
 
-        data = reply.readAll().data()
-        json_data = json.loads(data.decode('utf-8'))
-        utc = int(json_data['data']['serverTime'])
-        self.server_timestamp_base = utc + self.delay_ms
-        reply.deleteLater()
+    def __init__(self, order_type:OrderType, symbol:str, price:str, quantity:str, interval = 1, trigger_timestamp=-1):
+        super().__init__()
+        self.order_type = order_type
+        self.symbol = symbol
+        self.price = price
+        self.quantity = quantity
+        self.interval = interval
+        self.trigger_timestamp = trigger_timestamp
+        self.order_records = []
+        self.succeed_count = 0
+        self.failed_count = 0
 
-        self.server_time_updated.emit()
+        self.http_manager = QNetworkAccessManager(self)
 
-    def _on_symbol_info_replied(self, reply: QNetworkReply):
-        data = reply.readAll().data()
-        json_data = json.loads(data.decode('utf-8'))
-        code = json_data['code']
-        if code != '00000':
-            if code == '40034':
-                self.symbol_info_not_existed.emit()
-            return
-        info = json_data['data'][0]
-        self.symbol_info_updated.emit(info)
+        self.trigger_timer = QTimer(self)
+        self.trigger_timer.setInterval(interval)
+        self.trigger_timer.timeout.connect(self.order_trigger_event)
+        self.trigger_check_timer = QTimer(self)  # in case of system time drifting
+        self.trigger_check_timer.timeout.connect(self._on_check_time)
+        self.trigger_check_timer.setSingleShot(True)
+
+    def place_order(self):
+        server_time = self.rectified_timestamp
+        if self.trigger_timestamp > 0:
+            delta_ms = self.trigger_timestamp - server_time
+            if delta_ms < 0:
+                msg = (f'定时时间 {QDateTime.fromMSecsSinceEpoch(self.trigger_timestamp).toString()} '
+                       f'不能晚于当前时间 {QDateTime.fromMSecsSinceEpoch(server_time).toString()}')
+                return False, msg
+            self._on_check_time()
+        else:  # start immediately
+            self.trigger_timestamp = server_time
+            self.order_trigger_start_event()
+        return True, 'success'
+
+    @abstractmethod
+    def cancel_order(self):
+        pass
+
+    def stop_order_trigger(self):
+        self.trigger_timer.stop()
+
+    def order_trigger_start_event(self):
+        self.order_trigger_event()
+        self.trigger_timer.start()
+
+    @abstractmethod
+    def order_trigger_event(self):
+        pass
+
+    @abstractmethod
+    def is_running(self):
+        pass
+
+    def is_trigger_running(self):
+        return self.trigger_timer.isActive()
+
+    def countdown_ms(self):
+        delta_ms = self.trigger_timestamp - self.rectified_timestamp - self.delay_ms
+        return delta_ms
+
+    def _on_check_time(self):
+        delta_ms = self.countdown_ms()
+
+        if delta_ms < 1000:    # trigger
+            self.order_trigger_start_event()
+        elif delta_ms < 300_000:   # 5min
+            self.trigger_check_timer.setInterval(delta_ms)
+            self.trigger_check_timer.start()
+        else:   # > 5min
+            check_time = delta_ms / 3 * 2
+            self.trigger_check_timer.setInterval(check_time)
+            self.trigger_check_timer.start()
