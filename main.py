@@ -7,7 +7,7 @@ import sys
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication([])
-    app.setApplicationName("BitgetBot")
+    app.setApplicationName("Coin Rebot")
 
     widget = MainWindow()
     widget.resize(1080, 720)
