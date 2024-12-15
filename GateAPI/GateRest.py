@@ -1,16 +1,28 @@
 import json
 
-from PySide6.QtCore import qDebug, Slot
+from PySide6.QtCore import qDebug
 from PySide6.QtNetwork import QNetworkRequest, QNetworkReply, QNetworkAccessManager
 
-import BitgetAPI.consts_bitget as const
-import BitgetAPI.utils_bitget as utils
+from RestClient import RestBase, SymbolInfo, RestOrderBase
 from utils import get_timestamp
-from MiscSettings import BitgetConfiguration
-from RestClient import RestOrderBase, RestBase, SymbolInfo
+import GateAPI.consts_gate as const
 
+def setup_header(headers, request: QNetworkRequest):
+    for key, value in headers.items():
+        request.setRawHeader(key.encode(), value.encode())  # `encode()` 将字符串转换为字节
 
-class BitgetCommon(RestBase):
+def error_msg(status_code):
+    msg = {
+        202: '请求已被服务端接受，但是仍在处理中',
+        204: '请求成功，服务端没有提供返回体',
+        400: '无效请求',
+        401: '认证失败',
+        404: '未找到',
+        429: '请求过于频繁'
+    }
+    return msg[status_code] if status_code in msg else '未知错误'
+
+class GateCommon(RestBase):
     _delay_ms = 0
     server_timestamp_base = 0
     local_timestamp_base = 0
@@ -30,13 +42,15 @@ class BitgetCommon(RestBase):
 
     def request_utctime(self):
         request = QNetworkRequest(const.API_URL + const.SERVER_TIMESTAMP_URL)
+        setup_header(const.HEADERS, request)
         begin_ms = get_timestamp()
         reply = self.http_manager.get(request)
         reply.finished.connect(lambda: self._on_utc_replied(reply, begin_ms))
 
     def request_symbol(self, symbol):
-        url = const.API_URL + const.SYMBOL_INFO_URL + f'?symbol={symbol}'
+        url = const.API_URL + const.SYMBOL_INFO_URL + f'/{symbol}'
         request = QNetworkRequest(url)
+        setup_header(const.HEADERS, request)
         reply = self.http_manager.get(request)
         reply.finished.connect(lambda: self._on_symbol_info_replied(reply))
 
@@ -51,47 +65,42 @@ class BitgetCommon(RestBase):
 
         data = reply.readAll().data()
         json_data = json.loads(data.decode('utf-8'))
-        utc = int(json_data['data']['serverTime'])
+        utc = json_data['server_time']
         self.server_timestamp_base = utc + self.delay_ms
         reply.deleteLater()
 
         self.server_time_updated.emit()
 
     def _on_symbol_info_replied(self, reply: QNetworkReply):
-        data = reply.readAll().data()
-        json_data = json.loads(data.decode('utf-8'))
-        code = json_data['code']
-        if code != '00000':
-            if code == '40034':
-                symbol = json_data['msg'].split()[1] # "Parameter xxx does not exist"
-                self.symbol_info_not_existed.emit(symbol)
+        status_code = reply.attribute(QNetworkRequest.Attribute.HttpStatusCodeAttribute)
+        if status_code != 200:
+            qDebug(f'获取交易对出错：{error_msg(status_code)}')
             return
 
-        symbol_data = json_data['data'][0]
-        symbol = symbol_data['symbol']
-        price_precision = symbol_data['pricePrecision']
-        quantity_precision = symbol_data['quantityPrecision']
-        status = symbol_data['status']
+        data = reply.readAll().data()
+        json_data = json.loads(data.decode('utf-8'))
+        status = json_data['trade_status']
         status_dict = {
-            'offline': '维护',
-            'gray': '灰度',
-            'online': '上线',
-            'halt': '停盘'
+            'untradable': '无法交易',
+            'buyable': '仅可买入',
+            'sellable': '仅可卖出',
+            'tradable': '可以交易'
         }
-        info = SymbolInfo(symbol, status_dict[status], price_precision, quantity_precision)
+        info = SymbolInfo(json_data['id'], status_dict[status],
+                          json_data['precision'], json_data['amount_precision'])
         self.symbol_info_updated.emit(info)
 
 
-class BitgetOrder(RestOrderBase):
-    common = BitgetCommon()
+class GateOrder(RestOrderBase):
+    common = GateCommon()
 
     def __init__(self, order_type: RestOrderBase.OrderType, symbol: str, price: str, quantity: str, interval=1,
                  trigger_timestamp=-1,
                  api_key=None, secret_key=None, passphrase=None):
         super().__init__(order_type, symbol, price, quantity, interval, trigger_timestamp)
-        self.API_KEY = api_key if api_key is not None else BitgetConfiguration.apikey()
-        self.SECRET_KEY = secret_key if secret_key is not None else BitgetConfiguration.secretkey()
-        self.PASSPHRASE = passphrase if passphrase is not None else BitgetConfiguration.passphrase()
+        self.API_KEY = api_key if api_key is not None else Configurations.apikey()
+        self.SECRET_KEY = secret_key if secret_key is not None else Configurations.secretkey()
+        self.PASSPHRASE = passphrase if passphrase is not None else Configurations.passphrase()
         params = dict()
         params['symbol'] = self.symbol
         params['side'] = 'buy' if self.order_type == RestOrderBase.OrderType.Buy else 'sell'

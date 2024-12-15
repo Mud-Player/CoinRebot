@@ -5,6 +5,7 @@ from PySide6.QtCore import Qt, QtMsgType, qInstallMessageHandler, QDateTime
 from PySide6.QtWidgets import QGridLayout, QPushButton, QTextBrowser
 
 import MiscSettings
+from MiscSettings import BitgetConfiguration
 from PlaceOrderEdit import PlaceOrderWidget
 from OrderTable import OrderTableView
 from TimeStatus import UTCTimeWidget
@@ -52,7 +53,8 @@ class MainWindow(QtWidgets.QWidget):
         # misc configuration
         self.misc = MiscSettings.MiscSettingWidget(self)
 
-        if not MiscSettings.Configurations.apikey():
+        config = BitgetConfiguration()
+        if not config.apikey():
             self.misc.exec()
         misc_btn.clicked.connect(lambda : self.misc.exec())
 

@@ -13,13 +13,3 @@ APPLICATION_JSON = 'application/json'
 
 # header key
 LOCALE = 'locale'
-
-# method
-GET = "GET"
-POST = "POST"
-DELETE = "DELETE"
-
-# sign type
-RSA = "RSA"
-SHA256 = "SHA256"
-SIGN_TYPE = SHA256

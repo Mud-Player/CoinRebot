@@ -1,18 +1,29 @@
+import dataclasses
 from abc import abstractmethod, ABCMeta
 from enum import Enum
 
 from PySide6.QtCore import QObject, Signal, QTimer, QDateTime
 from PySide6.QtNetwork import QNetworkAccessManager
+from dataclasses import dataclass
 
 
 class MetaQObjectABC(type(QObject), ABCMeta):
     pass
 
+@dataclass
+class SymbolInfo:
+    symbol: str
+    status: str
+    price_precision: int
+    quantity_precision: int
+
+
+
 class RestBase(QObject, metaclass=MetaQObjectABC):
     server_time_updated = Signal()
-    symbol_info_updated = Signal(dict)
-    symbol_info_not_existed = Signal()
-    
+    symbol_info_updated = Signal(SymbolInfo)
+    symbol_info_not_existed = Signal(str)
+
     def __init__(self):
         super().__init__()
 
