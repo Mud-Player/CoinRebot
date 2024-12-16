@@ -139,19 +139,16 @@ class MiscSettingWidget(QtWidgets.QDialog):
         bitget_layout = QGridLayout()
         # api key
         bitget_layout.addWidget(QLabel("APIKey:"), 0, 0)
-        api_key = QLineEdit(bitget.apikey())
-        self.api_key = api_key
-        bitget_layout.addWidget(self.api_key, 0, 1)
+        self.bitget_api_key = QLineEdit(bitget.apikey())
+        bitget_layout.addWidget(self.bitget_api_key, 0, 1)
         # secret key
         bitget_layout.addWidget(QLabel("SecretKey:"), 1, 0)
-        secret_key = QLineEdit(bitget.secretkey())
-        self.secret_key = secret_key
-        bitget_layout.addWidget(self.secret_key, 1, 1)
+        self.bitget_secret_key = QLineEdit(bitget.secretkey())
+        bitget_layout.addWidget(self.bitget_secret_key, 1, 1)
         # passphrase
         bitget_layout.addWidget(QLabel("Passphrase:"), 2, 0)
-        passphrase = QLineEdit(bitget.passphrase())
-        self.passphrase = passphrase
-        bitget_layout.addWidget(self.passphrase, 2, 1)
+        self.bitget_passphrase = QLineEdit(bitget.passphrase())
+        bitget_layout.addWidget(self.bitget_passphrase, 2, 1)
         layout.addLayout(bitget_layout)
 
         # Gate.io
@@ -160,14 +157,12 @@ class MiscSettingWidget(QtWidgets.QDialog):
         gate_layout = QGridLayout()
         # api key
         gate_layout.addWidget(QLabel("APIKey:"), 0, 0)
-        api_key = QLineEdit(gate.apikey())
-        self.api_key = api_key
-        gate_layout.addWidget(self.api_key, 0, 1)
+        self.gate_api_key = QLineEdit(gate.apikey())
+        gate_layout.addWidget(self.gate_api_key, 0, 1)
         # secret key
         gate_layout.addWidget(QLabel("SecretKey:"), 1, 0)
-        secret_key = QLineEdit(gate.secretkey())
-        self.secret_key = secret_key
-        gate_layout.addWidget(self.secret_key, 1, 1)
+        self.gate_secret_key = QLineEdit(gate.secretkey())
+        gate_layout.addWidget(self.gate_secret_key, 1, 1)
         layout.addLayout(gate_layout)
 
         # space
@@ -203,13 +198,13 @@ class MiscSettingWidget(QtWidgets.QDialog):
 
     def _apply_settings(self):
         bitget = BitgetConfiguration()
-        bitget.set_apikey(self.api_key.text())
-        bitget.set_secretkey(self.secret_key.text())
-        bitget.set_passphrase(self.passphrase.text())
+        bitget.set_apikey(self.bitget_api_key.text())
+        bitget.set_secretkey(self.bitget_secret_key.text())
+        bitget.set_passphrase(self.bitget_passphrase.text())
         
         gate = GateConfiguration()
-        gate.set_apikey(self.api_key.text())
-        gate.set_secretkey(self.secret_key.text())
+        gate.set_apikey(self.gate_api_key.text())
+        gate.set_secretkey(self.gate_secret_key.text())
 
         proxy = ProxyConfiguration()
         proxy.set_use_proxy(self.proxy_switch.isChecked())
