@@ -1,6 +1,6 @@
 import json
 
-from PySide6.QtCore import qDebug, Slot
+from PySide6.QtCore import qDebug, Slot, QDateTime
 from PySide6.QtNetwork import QNetworkRequest, QNetworkReply, QNetworkAccessManager
 
 import BitgetAPI.consts_bitget as const

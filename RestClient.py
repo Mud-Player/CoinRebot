@@ -2,7 +2,7 @@ import dataclasses
 from abc import abstractmethod, ABCMeta
 from enum import Enum
 
-from PySide6.QtCore import QObject, Signal, QTimer, QDateTime
+from PySide6.QtCore import QObject, Signal, QTimer, QDateTime, qDebug
 from PySide6.QtNetwork import QNetworkAccessManager
 from dataclasses import dataclass
 
@@ -113,8 +113,8 @@ class RestOrderBase(RestBase):
         return self.trigger_timer.isActive()
 
     def countdown_ms(self):
-        delta_ms = self.trigger_timestamp - self.rectified_timestamp - self.delay_ms
-        return delta_ms
+        ms = self.trigger_timestamp - self.rectified_timestamp - self.delay_ms
+        return ms
 
     def _on_check_time(self):
         delta_ms = self.countdown_ms()
