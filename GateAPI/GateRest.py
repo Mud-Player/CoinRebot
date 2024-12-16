@@ -180,5 +180,6 @@ class GateOrder(RestOrderBase):
         else:
             self.failed_count += 1
             self.failed.emit()
-            qDebug(str(json_data))
+            if not self.is_finished():
+                qDebug(str(json_data))
 
