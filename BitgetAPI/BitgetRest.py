@@ -5,7 +5,7 @@ from PySide6.QtNetwork import QNetworkRequest, QNetworkReply, QNetworkAccessMana
 
 import BitgetAPI.consts_bitget as const
 import BitgetAPI.utils_bitget as utils
-from utils import get_timestamp
+from utils import get_timestamp, setup_header
 from MiscSettings import BitgetConfiguration
 from RestClient import RestOrderBase, RestBase, SymbolInfo
 
@@ -89,9 +89,12 @@ class BitgetOrder(RestOrderBase):
                  trigger_timestamp=-1,
                  api_key=None, secret_key=None, passphrase=None):
         super().__init__(order_type, symbol, price, quantity, interval, trigger_timestamp)
-        self.API_KEY = api_key if api_key is not None else BitgetConfiguration.apikey()
-        self.SECRET_KEY = secret_key if secret_key is not None else BitgetConfiguration.secretkey()
-        self.PASSPHRASE = passphrase if passphrase is not None else BitgetConfiguration.passphrase()
+        self.exchange = 'Bitget'
+
+        config = BitgetConfiguration()
+        self.API_KEY = api_key if api_key is not None else config.apikey()
+        self.SECRET_KEY = secret_key if secret_key is not None else config.secretkey()
+        self.PASSPHRASE = passphrase if passphrase is not None else config.passphrase()
         params = dict()
         params['symbol'] = self.symbol
         params['side'] = 'buy' if self.order_type == RestOrderBase.OrderType.Buy else 'sell'
@@ -150,8 +153,7 @@ class BitgetOrder(RestOrderBase):
         headers = utils.get_header(self.API_KEY, sign, timestamp, self.PASSPHRASE)
 
         request = QNetworkRequest(url)
-        for key, value in headers.items():
-            request.setRawHeader(key.encode(), value.encode())  # `encode()` 将字符串转换为字节
+        setup_header(headers, request)
         reply = self.http_manager.post(request, body.encode())
         return reply
 
@@ -165,6 +167,8 @@ class BitgetOrder(RestOrderBase):
             self.order_records.append(int(order_id))
             self.succeed_count += 1
             self.stop_order_trigger()
+            if self.succeed_count == 1:
+                qDebug(f'挂单成功，结束任务：{str(self.params)}')
             self.succeed.emit()
         else:  # error
             self.failed_count += 1

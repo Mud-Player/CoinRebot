@@ -56,6 +56,7 @@ class RestOrderBase(RestBase):
 
     def __init__(self, order_type:OrderType, symbol:str, price:str, quantity:str, interval = 1, trigger_timestamp=-1):
         super().__init__()
+        self.exchange = ''
         self.order_type = order_type
         self.symbol = symbol
         self.price = price

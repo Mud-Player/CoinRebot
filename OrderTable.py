@@ -32,18 +32,18 @@ class OrderTableView(QtWidgets.QWidget):
         self.sell_orders = []
 
         layout = QVBoxLayout(self)
-        headers = ['交易对', '价格', '数量', '定时', '倒计时', '状态', '结果']
+        headers = ['交易所', '交易对', '价格', '数量', '定时', '倒计时', '状态', '结果']
 
         layout.addWidget(QLabel('买入任务：'))
         self.buy_table = QTableWidget()
         layout.addWidget(self.buy_table)
-        self.buy_table.setColumnCount(7)
+        self.buy_table.setColumnCount(len(headers))
         self.buy_table.setHorizontalHeaderLabels(headers)
 
         layout.addWidget(QLabel('卖出任务：'))
         self.sell_table = QTableWidget()
         layout.addWidget(self.sell_table)
-        self.sell_table.setColumnCount(7)
+        self.sell_table.setColumnCount(len(headers))
         self.sell_table.setHorizontalHeaderLabels(headers)
 
         self.buy_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -81,6 +81,7 @@ class OrderTableView(QtWidgets.QWidget):
         self._on_order_removed_by_idx(self.sell_table, self.sell_orders.index(order))
 
     def _on_order_added(self, table, order):
+        exchange = QTableWidgetItem(order.exchange)
         symbol = QTableWidgetItem(order.symbol)
         price = QTableWidgetItem(order.price)
         quantity = QTableWidgetItem(order.quantity)
@@ -91,7 +92,7 @@ class OrderTableView(QtWidgets.QWidget):
         idx = table.rowCount()
 
         table.insertRow(idx)
-        for col, item in enumerate([symbol, price, quantity, time, countdown, status, result]):
+        for col, item in enumerate([exchange, symbol, price, quantity, time, countdown, status, result]):
             item.setTextAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
             table.setItem(idx, col, item)
 
@@ -110,12 +111,12 @@ class OrderTableView(QtWidgets.QWidget):
     def _update_order_item_by_idx(self, table, idx: int):
         orders = self.buy_orders if table == self.buy_table else self.sell_orders
         order = orders[idx]
-        countdown = table.item(idx, 4)
+        countdown = table.item(idx, 5)
         countdown_ms = max(order.countdown_ms(), 0)
         count_down_str = QTime.fromMSecsSinceStartOfDay(countdown_ms).toString('hh:mm:ss')
         countdown.setText(count_down_str)
 
-        status = table.item(idx, 5)
+        status = table.item(idx, 6)
         if order.is_finished():
             status.setText('完成')
         elif order.is_running():
@@ -123,7 +124,7 @@ class OrderTableView(QtWidgets.QWidget):
         else:
             status.setText('等待')
 
-        result = table.item(idx, 6)
+        result = table.item(idx, 7)
         succeed = order.succeed_count
         failed = order.failed_count
         total = succeed + failed

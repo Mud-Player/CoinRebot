@@ -1,15 +1,13 @@
 import json
 
-from PySide6.QtCore import qDebug
+from PySide6.QtCore import qDebug, Slot
 from PySide6.QtNetwork import QNetworkRequest, QNetworkReply, QNetworkAccessManager
 
+from GateAPI.utils_gate import gen_sign
+from MiscSettings import GateConfiguration
 from RestClient import RestBase, SymbolInfo, RestOrderBase
-from utils import get_timestamp
+from utils import get_timestamp, setup_header
 import GateAPI.consts_gate as const
-
-def setup_header(headers, request: QNetworkRequest):
-    for key, value in headers.items():
-        request.setRawHeader(key.encode(), value.encode())  # `encode()` 将字符串转换为字节
 
 def error_msg(status_code):
     msg = {
@@ -98,16 +96,18 @@ class GateOrder(RestOrderBase):
                  trigger_timestamp=-1,
                  api_key=None, secret_key=None, passphrase=None):
         super().__init__(order_type, symbol, price, quantity, interval, trigger_timestamp)
-        self.API_KEY = api_key if api_key is not None else Configurations.apikey()
-        self.SECRET_KEY = secret_key if secret_key is not None else Configurations.secretkey()
-        self.PASSPHRASE = passphrase if passphrase is not None else Configurations.passphrase()
+        self.exchange = 'Gate.io'
+
+        config = GateConfiguration()
+        self.API_KEY = api_key if api_key is not None else config.apikey()
+        self.SECRET_KEY = secret_key if secret_key is not None else config.secretkey()
         params = dict()
-        params['symbol'] = self.symbol
+        params['currency_pair'] = self.symbol
         params['side'] = 'buy' if self.order_type == RestOrderBase.OrderType.Buy else 'sell'
         params['orderType'] = 'limit'
         params['force'] = 'gtc'
         params['price'] = self.price
-        params['size'] = self.quantity
+        params['amount'] = self.quantity
         self.params = params
 
         self.common.server_time_updated.connect(self.server_time_updated.emit)
@@ -134,7 +134,7 @@ class GateOrder(RestOrderBase):
 
     def order_trigger_event(self):
         minimum_timestamp = self.trigger_timestamp
-        reply = self._request('/api/v2/spot/trade/place-order', self.params, minimum_timestamp)
+        reply = self._request('/api/v4/spot/orders', self.params, minimum_timestamp)
         reply.finished.connect(lambda: self._on_replied(reply))
 
     def cancel_order(self):
@@ -155,27 +155,30 @@ class GateOrder(RestOrderBase):
 
         # sign & header
         body = json.dumps(params)
-        sign = utils.sign(utils.pre_hash(timestamp, 'POST', api_path, str(body)), self.SECRET_KEY)
-        headers = utils.get_header(self.API_KEY, sign, timestamp, self.PASSPHRASE)
+        sign_headers = gen_sign(self.API_KEY, self.SECRET_KEY, int(timestamp/1000), 'POST', api_path, None, body)
+        headers = const.HEADERS
+        headers.update(sign_headers)
 
         request = QNetworkRequest(url)
-        for key, value in headers.items():
-            request.setRawHeader(key.encode(), value.encode())  # `encode()` 将字符串转换为字节
+        setup_header(headers, request)
         reply = self.http_manager.post(request, body.encode())
         return reply
 
     @Slot(QNetworkReply)
     def _on_replied(self, reply):
+        status_code = reply.attribute(QNetworkRequest.Attribute.HttpStatusCodeAttribute)
         data = reply.readAll().data()
         json_data = json.loads(data)
-        code = json_data['code']
-        if code == '00000':  # success
-            order_id = json_data['data']['orderId']
+        if status_code == 200 or status_code == 201:
+            order_id = json_data['id']
             self.order_records.append(int(order_id))
             self.succeed_count += 1
             self.stop_order_trigger()
+            if self.succeed_count == 1:
+                qDebug(f'挂单成功，结束任务：{str(self.params)}')
             self.succeed.emit()
-        else:  # error
+        else:
             self.failed_count += 1
             self.failed.emit()
             qDebug(str(json_data))
+
