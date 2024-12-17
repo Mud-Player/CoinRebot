@@ -123,8 +123,8 @@ class BitgetOrder(RestOrderBase):
         self.common.request_symbol(symbol)
 
     def order_trigger_start_event(self):
-        qDebug(f'开始执行下单: {str(self.params)}')
         super().order_trigger_start_event()
+        qDebug(f'开始执行下单: {str(self.params)}')
 
     def order_trigger_event(self):
         minimum_timestamp = self.trigger_timestamp
