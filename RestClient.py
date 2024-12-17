@@ -18,11 +18,11 @@ class SymbolInfo:
     quantity_precision: int
 
 
-
 class RestBase(QObject, metaclass=MetaQObjectABC):
     server_time_updated = Signal()
     symbol_info_updated = Signal(SymbolInfo)
     symbol_info_not_existed = Signal(str)
+    http_manager = QNetworkAccessManager()
 
     def __init__(self):
         super().__init__()
@@ -66,8 +66,6 @@ class RestOrderBase(RestBase):
         self.order_records = []
         self.succeed_count = 0
         self.failed_count = 0
-
-        self.http_manager = QNetworkAccessManager(self)
 
         self.trigger_timer = QTimer(self)
         self.trigger_timer.setInterval(interval)

@@ -27,7 +27,6 @@ class GateCommon(RestBase):
 
     def __init__(self):
         super().__init__()
-        self.http_manager = QNetworkAccessManager(self)
 
     @property
     def rectified_timestamp(self):
