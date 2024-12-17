@@ -29,7 +29,7 @@ class MainWindow(QtWidgets.QWidget):
         layout = QGridLayout(self)
         # utc
         time = UTCTimeWidget()
-        layout.addWidget(time, 0, 0)
+        layout.addWidget(time, 0, 0, 1, 2)
         # misc setup button
         misc_btn = QPushButton("Setup")
         layout.addWidget(misc_btn, 0, 1, Qt.AlignmentFlag.AlignRight)

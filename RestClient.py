@@ -2,7 +2,7 @@ import dataclasses
 from abc import abstractmethod, ABCMeta
 from enum import Enum
 
-from PySide6.QtCore import QObject, Signal, QTimer, QDateTime, qDebug
+from PySide6.QtCore import QObject, Signal, QTimer, QDateTime, qDebug, QTime
 from PySide6.QtNetwork import QNetworkAccessManager
 from dataclasses import dataclass
 
@@ -118,7 +118,6 @@ class RestOrderBase(RestBase):
 
     def _on_check_time(self):
         delta_ms = self.countdown_ms()
-
         if delta_ms < 1000:    # trigger
             self.order_trigger_start_event()
         elif delta_ms < 300_000:   # 5min

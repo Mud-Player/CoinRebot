@@ -117,6 +117,39 @@ class GateConfiguration(Configuration):
         self.settings.setValue("Secretkey", value)
         self.settings.endGroup()
 
+
+
+class MexcConfiguration(Configuration):
+
+    def __init__(self):
+        super().__init__()
+
+    def __del__(self):
+        self.settings.sync()
+
+    def apikey(self):
+        self.settings.beginGroup('Mexc')
+        ret = str(self.settings.value("APIKey", ""))
+        self.settings.endGroup()
+        return ret
+
+    def set_apikey(self, value):
+        self.settings.beginGroup('Mexc')
+        self.settings.setValue("APIKey", value)
+        self.settings.endGroup()
+
+    def secretkey(self):
+        self.settings.beginGroup('Mexc')
+        ret = str(self.settings.value("Secretkey", ""))
+        self.settings.endGroup()
+        return ret
+
+    def set_secretkey(self, value):
+        self.settings.beginGroup('Mexc')
+        self.settings.setValue("Secretkey", value)
+        self.settings.endGroup()
+
+
 def _apply_proxy():
     proxy = ProxyConfiguration()
     if proxy.use_proxy():
@@ -134,7 +167,7 @@ class MiscSettingWidget(QtWidgets.QDialog):
         layout = QtWidgets.QVBoxLayout(self)
 
         # Bitget
-        layout.addWidget(QLabel('Bitget'))
+        layout.addWidget(QLabel('Bitget:'))
         bitget = BitgetConfiguration()
         bitget_layout = QGridLayout()
         # api key
@@ -151,8 +184,11 @@ class MiscSettingWidget(QtWidgets.QDialog):
         bitget_layout.addWidget(self.bitget_passphrase, 2, 1)
         layout.addLayout(bitget_layout)
 
+        # space
+        layout.addItem(QSpacerItem(20, 20))
+        
         # Gate.io
-        layout.addWidget(QLabel('Gate.io'))
+        layout.addWidget(QLabel('Gate.io:'))
         gate = GateConfiguration()
         gate_layout = QGridLayout()
         # api key
@@ -168,6 +204,23 @@ class MiscSettingWidget(QtWidgets.QDialog):
         # space
         layout.addItem(QSpacerItem(20, 20))
 
+        # Mexc.io
+        layout.addWidget(QLabel('Mexc.io:'))
+        mexc = MexcConfiguration()
+        mexc_layout = QGridLayout()
+        # api key
+        mexc_layout.addWidget(QLabel("APIKey:"), 0, 0)
+        self.mexc_api_key = QLineEdit(mexc.apikey())
+        mexc_layout.addWidget(self.mexc_api_key, 0, 1)
+        # secret key
+        mexc_layout.addWidget(QLabel("SecretKey:"), 1, 0)
+        self.mexc_secret_key = QLineEdit(mexc.secretkey())
+        mexc_layout.addWidget(self.mexc_secret_key, 1, 1)
+        layout.addLayout(mexc_layout)
+
+        # space
+        layout.addItem(QSpacerItem(20, 20))
+        
         # proxy
         proxy_layout = QGridLayout()
         # proxy on/of
@@ -205,6 +258,10 @@ class MiscSettingWidget(QtWidgets.QDialog):
         gate = GateConfiguration()
         gate.set_apikey(self.gate_api_key.text())
         gate.set_secretkey(self.gate_secret_key.text())
+        
+        mexc = MexcConfiguration()
+        mexc.set_apikey(self.mexc_api_key.text())
+        mexc.set_secretkey(self.mexc_secret_key.text())
 
         proxy = ProxyConfiguration()
         proxy.set_use_proxy(self.proxy_switch.isChecked())

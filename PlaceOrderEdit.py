@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QGridLayout, QLabel, QLineEdit, QRadioButton, QDat
 import Buttons
 from BitgetAPI.BitgetRest import BitgetOrder, BitgetCommon
 from GateAPI.GateRest import GateOrder, GateCommon
+from MEXCAPI.MexcRest import MexcCommon, MexcOrder
 from OrdersDB import Database
 from RestClient import RestOrderBase, SymbolInfo
 
@@ -82,7 +83,7 @@ class PlaceOrderWidget(QtWidgets.QWidget):
             case 1:
                 self.rest_client = GateCommon()
             case 2:
-                pass
+                self.rest_client = MexcCommon()
         self.rest_client.symbol_info_updated.connect(self._on_symbol_info_updated)
         self.rest_client.symbol_info_not_existed.connect(self._on_symbol_info_not_existed)
 
@@ -95,6 +96,8 @@ class PlaceOrderWidget(QtWidgets.QWidget):
             case 2:
                 self.exchange_remark.setText('交易对格式: BTCUSDT')
         self._setup_new_client()
+        if self.symbol.text():
+            self.symbol.editingFinished.emit()
 
     def _on_timer_switch_toggled(self):
         if self.timer_switch.isChecked():
@@ -156,7 +159,7 @@ class PlaceOrderWidget(QtWidgets.QWidget):
         interval = 1000 / hz
         is_buy_order = self.order_toggle.button1_isChecked()
         order_type = RestOrderBase.OrderType.Buy if is_buy_order else RestOrderBase.OrderType.Sell
-        order_cls = [BitgetOrder, GateOrder]
+        order_cls = [BitgetOrder, GateOrder, MexcOrder]
         exchange_idx = self.exchanges.currentIndex()
         if immediately:
             order = order_cls[exchange_idx](order_type, symbol, price, quantity, interval)

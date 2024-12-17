@@ -3,7 +3,7 @@ import hmac
 import time
 
 
-def gen_sign(api_key, api_secret, timestamp_s, method, url, query_string=None, payload_string=None):
+def gen_signed_header(api_key, api_secret, timestamp_s, method, url, query_string=None, payload_string=None):
     sha = hashlib.sha512()
     sha.update((payload_string or "").encode('utf-8'))
     hashed_payload = sha.hexdigest()

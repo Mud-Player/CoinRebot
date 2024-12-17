@@ -3,24 +3,21 @@ import json
 from PySide6.QtCore import qDebug, Slot
 from PySide6.QtNetwork import QNetworkRequest, QNetworkReply, QNetworkAccessManager
 
-from GateAPI.utils_gate import gen_signed_header
-from MiscSettings import GateConfiguration
+from MEXCAPI.utils_mexc import gen_signed_body
+from MiscSettings import MexcConfiguration
 from RestClient import RestBase, SymbolInfo, RestOrderBase
 from utils import get_timestamp, setup_header
-import GateAPI.consts_gate as const
+import MEXCAPI.consts_mexc as const
 
 def error_msg(status_code):
     msg = {
-        202: '请求已被服务端接受，但是仍在处理中',
-        204: '请求成功，服务端没有提供返回体',
-        400: '无效请求',
-        401: '认证失败',
-        404: '未找到',
-        429: '请求过于频繁'
+        401: '身份认证、权限错误',
+        403: '违反WAF限制(Web应用程序防火墙)',
+        429: '警告访问频次超限，即将被封IP',
     }
     return msg[status_code] if status_code in msg else '未知错误'
 
-class GateCommon(RestBase):
+class MexcCommon(RestBase):
     _delay_ms = 0
     server_timestamp_base = 0
     local_timestamp_base = 0
@@ -40,13 +37,12 @@ class GateCommon(RestBase):
 
     def request_utctime(self):
         request = QNetworkRequest(const.API_URL + const.SERVER_TIMESTAMP_URL)
-        setup_header(const.HEADERS, request)
         begin_ms = get_timestamp()
         reply = self.http_manager.get(request)
         reply.finished.connect(lambda: self._on_utc_replied(reply, begin_ms))
 
     def request_symbol(self, symbol):
-        url = const.API_URL + const.SYMBOL_INFO_URL + f'/{symbol}'
+        url = const.API_URL + const.SYMBOL_INFO_URL + f'?symbol={symbol}'
         request = QNetworkRequest(url)
         setup_header(const.HEADERS, request)
         reply = self.http_manager.get(request)
@@ -63,7 +59,7 @@ class GateCommon(RestBase):
 
         data = reply.readAll().data()
         json_data = json.loads(data.decode('utf-8'))
-        utc = json_data['server_time']
+        utc = json_data['serverTime']
         self.server_timestamp_base = utc + self.delay_ms
         reply.deleteLater()
 
@@ -78,37 +74,36 @@ class GateCommon(RestBase):
 
         data = reply.readAll().data()
         json_data = json.loads(data.decode('utf-8'))
-        status = json_data['trade_status']
+        json_data = json_data['symbols'][0]
+        status = json_data['status']
         status_dict = {
-            'untradable': '无法交易',
-            'buyable': '仅可买入',
-            'sellable': '仅可卖出',
-            'tradable': '可以交易'
+            '1': '上架',
+            '2': '暂停',
+            '3': '下架'
         }
-        info = SymbolInfo(json_data['id'], status_dict[status],
-                          json_data['precision'], json_data['amount_precision'])
+        info = SymbolInfo(json_data['symbol'], status_dict[status],
+                          json_data['quotePrecision'], json_data['quoteAssetPrecision'])
         self.symbol_info_updated.emit(info)
 
 
-class GateOrder(RestOrderBase):
-    common = GateCommon()
+class MexcOrder(RestOrderBase):
+    common = MexcCommon()
 
     def __init__(self, order_type: RestOrderBase.OrderType, symbol: str, price: str, quantity: str, interval=1,
                  trigger_timestamp=-1,
                  api_key=None, secret_key=None):
         super().__init__(order_type, symbol, price, quantity, interval, trigger_timestamp)
-        self.exchange = 'Gate.io'
+        self.exchange = 'Mexc.io'
 
-        config = GateConfiguration()
+        config = MexcConfiguration()
         self.API_KEY = api_key if api_key is not None else config.apikey()
         self.SECRET_KEY = secret_key if secret_key is not None else config.secretkey()
         params = dict()
-        params['currency_pair'] = self.symbol
-        params['side'] = 'buy' if self.order_type == RestOrderBase.OrderType.Buy else 'sell'
-        params['orderType'] = 'limit'
-        params['force'] = 'gtc'
+        params['symbol'] = self.symbol
+        params['side'] = 'BUY' if self.order_type == RestOrderBase.OrderType.Buy else 'SELL'
+        params['type'] = 'LIMIT'
         params['price'] = self.price
-        params['amount'] = self.quantity
+        params['quantity'] = self.quantity
         self.params = params
 
         self.common.server_time_updated.connect(self.server_time_updated.emit)
@@ -135,7 +130,7 @@ class GateOrder(RestOrderBase):
 
     def order_trigger_event(self):
         minimum_timestamp = self.trigger_timestamp
-        reply = self._request('/api/v4/spot/orders', self.params, minimum_timestamp)
+        reply = self._request('/api/v3/order', self.params, minimum_timestamp)
         reply.finished.connect(lambda: self._on_replied(reply))
 
     def cancel_order(self):
@@ -155,10 +150,10 @@ class GateOrder(RestOrderBase):
             timestamp = max(timestamp, minimum_timestamp)
 
         # sign & header
-        body = json.dumps(params)
-        sign_headers = gen_signed_header(self.API_KEY, self.SECRET_KEY, int(timestamp / 1000), 'POST', api_path, None, body)
-        headers = const.HEADERS
-        headers.update(sign_headers)
+        self.params['timestamp'] = timestamp
+        body = gen_signed_body(self.SECRET_KEY, timestamp, self.params)
+        headers = const.HEADERS.copy()
+        headers['X-MEXC-APIKEY'] = self.API_KEY
 
         request = QNetworkRequest(url)
         setup_header(headers, request)
@@ -171,8 +166,8 @@ class GateOrder(RestOrderBase):
         data = reply.readAll().data()
         json_data = json.loads(data)
         if status_code == 200 or status_code == 201:
-            order_id = json_data['id']
-            self.order_records.append(int(order_id))
+            order_id = json_data['orderId']
+            self.order_records.append(order_id)
             self.succeed_count += 1
             self.stop_order_trigger()
             if self.succeed_count == 1:
