@@ -1,5 +1,5 @@
 from PySide6 import QtWidgets
-from PySide6.QtCore import QTimer, QDateTime
+from PySide6.QtCore import QTimer, QDateTime, Qt
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QSpacerItem, QSizePolicy
 
 from BitgetAPI.BitgetRest import BitgetCommon
@@ -45,9 +45,10 @@ class UTCTimeWidget(QtWidgets.QWidget):
         layout.addItem(QSpacerItem(20, 20, hData=QSizePolicy.Policy.Expanding))
         
         timer = QTimer(self)
+        timer.setTimerType(Qt.TimerType.PreciseTimer)
         timer.timeout.connect(lambda : [self.bitget_client.request_utctime(),
                                         self.gate_client.request_utctime(),
-                                        self.mexc_client.request_utctime(),])
+                                        self.mexc_client.request_utctime()])
         timer.setInterval(1000)
         timer.start()
 

@@ -2,7 +2,7 @@ import dataclasses
 from abc import abstractmethod, ABCMeta
 from enum import Enum
 
-from PySide6.QtCore import QObject, Signal, QTimer, QDateTime, qDebug, QTime
+from PySide6.QtCore import QObject, Signal, QTimer, QDateTime, qDebug, QTime, Qt
 from PySide6.QtNetwork import QNetworkAccessManager
 from dataclasses import dataclass
 
@@ -71,8 +71,10 @@ class RestOrderBase(RestBase):
 
         self.trigger_timer = QTimer(self)
         self.trigger_timer.setInterval(interval)
+        self.trigger_timer.setTimerType(Qt.TimerType.PreciseTimer)
         self.trigger_timer.timeout.connect(self.order_trigger_event)
         self.trigger_check_timer = QTimer(self)  # in case of system time drifting
+        self.trigger_check_timer.setTimerType(Qt.TimerType.PreciseTimer)
         self.trigger_check_timer.timeout.connect(self._on_check_time)
         self.trigger_check_timer.setSingleShot(True)
 
@@ -118,6 +120,7 @@ class RestOrderBase(RestBase):
 
     def _on_check_time(self):
         delta_ms = self.countdown_ms()
+        qDebug(str(delta_ms))
         if delta_ms < 1000:    # trigger
             self.order_trigger_start_event()
         elif delta_ms < 300_000:   # 5min
