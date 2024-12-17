@@ -64,20 +64,20 @@ class OrderTableView(QtWidgets.QWidget):
         timer.timeout.connect(self._update_all_order_item)
         timer.start()
 
-    @Slot(OrdersDB.BitgetOrder)
-    def _on_buy_order_added(self, order: OrdersDB.BitgetOrder):
+    @Slot(OrdersDB.RestOrderBase)
+    def _on_buy_order_added(self, order: OrdersDB.RestOrderBase):
         self._on_order_added(self.buy_table, order)
 
-    @Slot(OrdersDB.BitgetOrder)
-    def _on_sell_order_added(self, order: OrdersDB.BitgetOrder):
+    @Slot(OrdersDB.RestOrderBase)
+    def _on_sell_order_added(self, order: OrdersDB.RestOrderBase):
         self._on_order_added(self.sell_table, order)
 
-    @Slot(OrdersDB.BitgetOrder)
-    def _on_buy_order_removed(self, order: OrdersDB.BitgetOrder):
+    @Slot(OrdersDB.RestOrderBase)
+    def _on_buy_order_removed(self, order: OrdersDB.RestOrderBase):
         self._on_order_removed_by_idx(self.buy_table, self.buy_orders.index(order))
 
-    @Slot(OrdersDB.BitgetOrder)
-    def _on_sell_order_removed(self, order: OrdersDB.BitgetOrder):
+    @Slot(OrdersDB.RestOrderBase)
+    def _on_sell_order_removed(self, order: OrdersDB.RestOrderBase):
         self._on_order_removed_by_idx(self.sell_table, self.sell_orders.index(order))
 
     def _on_order_added(self, table, order):

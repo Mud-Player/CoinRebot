@@ -1,6 +1,7 @@
 from PySide6.QtCore import QObject, Signal, QDateTime
 
 from BitgetAPI.BitgetRest import BitgetOrder
+from RestClient import RestOrderBase
 
 
 def singleton(cls):
@@ -15,21 +16,21 @@ def singleton(cls):
 
 @singleton
 class Database(QObject):
-    buy_order_added = Signal(BitgetOrder)
-    buy_order_removed = Signal(BitgetOrder)
-    sell_order_added = Signal(BitgetOrder)
-    sell_order_removed = Signal(BitgetOrder)
+    buy_order_added = Signal(RestOrderBase)
+    buy_order_removed = Signal(RestOrderBase)
+    sell_order_added = Signal(RestOrderBase)
+    sell_order_removed = Signal(RestOrderBase)
 
     def __init__(self):
         super().__init__()
         self.buy_orders = []
         self.sell_orders = []
 
-    def push_buy_order(self, order: BitgetOrder):
+    def push_buy_order(self, order: RestOrderBase):
         self.buy_orders.append(order)
         self.buy_order_added.emit(order)
 
-    def push_sell_order(self, order: BitgetOrder):
+    def push_sell_order(self, order: RestOrderBase):
         self.sell_orders.append(order)
         self.sell_order_added.emit(order)
 

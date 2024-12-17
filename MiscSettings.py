@@ -5,7 +5,7 @@ from PySide6.QtWidgets import QLabel, QLineEdit, QSpacerItem, QRadioButton, QPus
 
 
 class Configuration:
-    settings = QSettings("Li.Player", "CoinRebot")
+    settings = QSettings("Li.Player", "CoinRobot")
 
 class ProxyConfiguration(Configuration):
     def __init__(self):
