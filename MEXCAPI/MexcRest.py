@@ -132,7 +132,6 @@ class MexcOrder(RestOrderBase):
     def order_trigger_start_event(self):
         super().order_trigger_start_event()
         qDebug(f'开始执行下单: {str(self.params)}')
-        qDebug(f'{get_timestamp()}')
 
     def order_trigger_event(self):
         minimum_timestamp = self.trigger_timestamp
@@ -141,12 +140,6 @@ class MexcOrder(RestOrderBase):
 
     def cancel_order(self):
         pass
-
-    def is_finished(self):
-        return self.succeed_count > 0
-
-    def is_running(self):
-        return self.countdown_ms() <= 0 and self.is_trigger_running()
 
     def _request(self, api_path, params, minimum_timestamp=None):
         url = const.API_URL + api_path
@@ -185,7 +178,6 @@ class MexcOrder(RestOrderBase):
             json_data = json.loads(data)
         except:
             return
-        qDebug(f'reply {get_timestamp()}')
         if status_code == 200 or status_code == 201:
             order_id = json_data['orderId']
             self.order_records.append(order_id)
@@ -195,8 +187,16 @@ class MexcOrder(RestOrderBase):
                 qDebug(f'挂单成功，结束任务：{str(self.params)}')
             self.succeed.emit()
         else:
+            msg_code = json_data['code']
+            self.error_code = msg_code
+            match msg_code:
+                case -1121 | 30004:
+                    self.stop_order_trigger()
+                    qDebug(f'挂单失败: {json_data}')
+                    self.failed.emit()
+                case _:
+                    if not self.is_finished():
+                        qDebug(str(json_data))
+
             self.failed_count += 1
             self.failed.emit()
-            if not self.is_finished():
-                qDebug(str(json_data))
-

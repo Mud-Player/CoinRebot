@@ -66,6 +66,7 @@ class RestOrderBase(RestBase):
         self.order_records = []
         self.succeed_count = 0
         self.failed_count = 0
+        self.error_code = -1 # fatal error, means no need to do more requesting
 
         self.trigger_timer = QTimer(self)
         self.trigger_timer.setInterval(interval)
@@ -108,11 +109,16 @@ class RestOrderBase(RestBase):
     def order_trigger_event(self):
         pass
 
-    @abstractmethod
     def is_running(self):
-        pass
+        return self.is_trigger_active()
 
-    def is_trigger_running(self):
+    def is_finished(self):
+        return (self.succeed_count + self.failed_count) > 0 and not self.is_trigger_active()
+
+    def has_error(self):
+        return self.error_code > 0
+
+    def is_trigger_active(self):
         return self.trigger_timer.isActive()
 
     def countdown_ms(self):
@@ -121,7 +127,6 @@ class RestOrderBase(RestBase):
 
     def _on_check_time(self):
         delta_ms = self.countdown_ms()
-        qDebug(f'delta_time: {delta_ms}')
         if delta_ms < 1000:    # trigger
             self.order_trigger_start_event()
         elif delta_ms < 5000:   # 5s

@@ -118,7 +118,10 @@ class OrderTableView(QtWidgets.QWidget):
 
         status = table.item(idx, 6)
         if order.is_finished():
-            status.setText('完成')
+            if order.has_error():
+                status.setText('失败')
+            else:
+                status.setText('完成')
         elif order.is_running():
             status.setText('执行中')
         else:

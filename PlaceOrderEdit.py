@@ -64,8 +64,7 @@ class PlaceOrderWidget(QtWidgets.QWidget):
         self.apply = QPushButton('添加任务')
         self.apply.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         layout.addWidget(self.apply, 8, 0, 1, 3, Qt.AlignmentFlag.AlignHCenter)
-        self.apply.clicked.connect(self._on_apply_or_cancel_clicked)
-        self.apply.setProperty("started", False)
+        self.apply.clicked.connect(self._on_apply_clicked)
 
         self.timer_switch.toggle()
 
@@ -105,7 +104,7 @@ class PlaceOrderWidget(QtWidgets.QWidget):
             self.apply.setText('添加任务')
         else:
             self.datetime.setEnabled(False)
-            self.apply.setText('立即执行')
+            self.apply.setText('立即下单')
 
     def _on_symbol_edit_finished(self):
         self.rest_client.request_symbol(self.symbol.text())
@@ -125,32 +124,14 @@ class PlaceOrderWidget(QtWidgets.QWidget):
         self.price_remark.setText(f'价格精度：{price_precision}')
         self.quantity_remark.setText(f'数量精度：{quantity_precision}')
 
-    def _on_apply_or_cancel_clicked(self):
+    def _on_apply_clicked(self):
         # scheduled order
         if self.timer_switch.isChecked():
             self._place_order()
         else: # immediately order
-            # start
-            if not self.apply.property('started'):
-                self._place_immediately_order()
-                self.apply.setText('停止')
-                self.timer_switch.setEnabled(False)
-                self.apply.setProperty('started', True)
-            else: # stop
-                self._cancel_immediately_order()
-                self.apply.setText('立即执行')
-                self.timer_switch.setEnabled(True)
-                self.apply.setProperty('started', False)
+            self._place_order(True)
+            QMessageBox.information(self,'立即下单任务', '立即下单任务已添加，请在右侧表格查看')
 
-    def _place_immediately_order(self):
-        self._place_order(True)
-    
-    def _cancel_immediately_order(self):
-        if self.order_toggle.button1_isChecked():
-            self.database.pop_buy_order().deleteLater()
-        else:
-            self.database.pop_sell_order().deleteLater()
-    
     def _place_order(self, immediately = False):
         symbol = self.symbol.text()
         price = self.price.text()

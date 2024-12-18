@@ -136,12 +136,6 @@ class BitgetOrder(RestOrderBase):
     def cancel_order(self):
         pass
 
-    def is_finished(self):
-        return self.succeed_count > 0
-
-    def is_running(self):
-        return self.countdown_ms() <= 0 and self.is_trigger_running()
-
     def _request(self, api_path, params, minimum_timestamp=None):
         url = const.API_URL + api_path
 
@@ -163,8 +157,8 @@ class BitgetOrder(RestOrderBase):
     def _on_replied(self, reply):
         data = reply.readAll().data()
         json_data = json.loads(data)
-        code = json_data['code']
-        if code == '00000':  # success
+        code = int(json_data['code'])
+        if code == 00000:  # success
             order_id = json_data['data']['orderId']
             self.order_records.append(int(order_id))
             self.succeed_count += 1
@@ -173,7 +167,14 @@ class BitgetOrder(RestOrderBase):
                 qDebug(f'挂单成功，结束任务：{str(self.params)}')
             self.succeed.emit()
         else:  # error
+            match code:
+                case 43009 | 40034 | 43012:
+                    self.stop_order_trigger()
+                    self.error_code = code
+                    qDebug(f'挂单失败: {json_data}')
+                    self.failed.emit()
+                case _:
+                    if not self.is_finished():
+                        qDebug(str(json_data))
+
             self.failed_count += 1
-            self.failed.emit()
-            if not self.is_finished():
-                qDebug(str(json_data))

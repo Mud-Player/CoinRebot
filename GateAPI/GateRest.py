@@ -143,12 +143,6 @@ class GateOrder(RestOrderBase):
     def cancel_order(self):
         pass
 
-    def is_finished(self):
-        return self.succeed_count > 0
-
-    def is_running(self):
-        return self.countdown_ms() <= 0 and self.is_trigger_running()
-
     def _request(self, api_path, params, minimum_timestamp=None):
         url = const.API_URL + api_path
 
@@ -176,13 +170,21 @@ class GateOrder(RestOrderBase):
             order_id = json_data['id']
             self.order_records.append(int(order_id))
             self.succeed_count += 1
+            self.error_code = status_code
             self.stop_order_trigger()
             if self.succeed_count == 1:
                 qDebug(f'挂单成功，结束任务：{str(self.params)}')
             self.succeed.emit()
         else:
-            self.failed_count += 1
-            self.failed.emit()
-            if not self.is_finished():
-                qDebug(str(json_data))
+            err_label = json_data['label']
+            self.error_code = 1
+            match err_label:
+                case 'INVALID_CURRENCY_PAIR' | 'BALANCE_NOT_ENOUGH':
+                    self.stop_order_trigger()
+                    qDebug(f'挂单失败: {json_data}')
+                    self.failed.emit()
+                case _:
+                    if not self.is_finished():
+                        qDebug(str(json_data))
 
+            self.failed_count += 1
