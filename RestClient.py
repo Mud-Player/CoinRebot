@@ -97,6 +97,9 @@ class RestOrderBase(RestBase):
     def stop_order_trigger(self):
         self.trigger_timer.stop()
 
+    def order_trigger_5s_countdown_event(self):
+        pass
+
     def order_trigger_start_event(self):
         self.order_trigger_event()
         self.trigger_timer.start()
@@ -118,13 +121,14 @@ class RestOrderBase(RestBase):
 
     def _on_check_time(self):
         delta_ms = self.countdown_ms()
-        qDebug(str(delta_ms))
+        qDebug(f'delta_time: {delta_ms}')
         if delta_ms < 1000:    # trigger
             self.order_trigger_start_event()
-        elif delta_ms < 300_000:   # 5min
+        elif delta_ms < 5000:   # 5s
             self.trigger_check_timer.setInterval(delta_ms)
             self.trigger_check_timer.start()
-        else:   # > 5min
-            check_time = delta_ms / 3 * 2
+            self.order_trigger_5s_countdown_event()
+        else:   # > 5s
+            check_time = delta_ms - 5000
             self.trigger_check_timer.setInterval(check_time)
             self.trigger_check_timer.start()

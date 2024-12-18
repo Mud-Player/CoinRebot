@@ -61,7 +61,10 @@ class GateCommon(RestBase):
         self._delay_ms = delay
 
         data = reply.readAll().data()
-        json_data = json.loads(data.decode('utf-8'))
+        try:
+            json_data = json.loads(data.decode('utf-8'))
+        except:
+            return
         utc = json_data['server_time']
         self.server_timestamp_base = utc + self.delay_ms
         reply.deleteLater()

@@ -57,7 +57,10 @@ class MexcCommon(RestBase):
         self._delay_ms = delay
 
         data = reply.readAll().data()
-        json_data = json.loads(data.decode('utf-8'))
+        try:
+            json_data = json.loads(data.decode('utf-8'))
+        except:
+            return
         utc = json_data['serverTime']
         self.server_timestamp_base = utc + self.delay_ms
         reply.deleteLater()
@@ -123,9 +126,13 @@ class MexcOrder(RestOrderBase):
     def request_symbol(self, symbol):
         self.common.request_symbol(symbol)
 
+    def order_trigger_5s_countdown_event(self):
+        self._head('/api/v3/order', self.params)
+
     def order_trigger_start_event(self):
         super().order_trigger_start_event()
         qDebug(f'开始执行下单: {str(self.params)}')
+        qDebug(f'{get_timestamp()}')
 
     def order_trigger_event(self):
         minimum_timestamp = self.trigger_timestamp
@@ -149,8 +156,8 @@ class MexcOrder(RestOrderBase):
             timestamp = max(timestamp, minimum_timestamp)
 
         # sign & header
-        self.params['timestamp'] = timestamp
-        body = gen_signed_body(self.SECRET_KEY, timestamp, self.params)
+        params = params | {'timestamp': timestamp}
+        body = gen_signed_body(self.SECRET_KEY, timestamp, params)
         headers = const.HEADERS.copy()
         headers['X-MEXC-APIKEY'] = self.API_KEY
 
@@ -159,11 +166,26 @@ class MexcOrder(RestOrderBase):
         reply = self.http_manager.post(request, body.encode())
         return reply
 
+    def _head(self, api_path, params, minimum_timestamp=None):
+        url = const.API_URL + api_path
+
+        headers = const.HEADERS.copy()
+        headers['X-MEXC-APIKEY'] = self.API_KEY
+
+        request = QNetworkRequest(url)
+        setup_header(headers, request)
+        reply = self.http_manager.head(request)
+        return reply
+
     @Slot(QNetworkReply)
     def _on_replied(self, reply):
         status_code = reply.attribute(QNetworkRequest.Attribute.HttpStatusCodeAttribute)
         data = reply.readAll().data()
-        json_data = json.loads(data)
+        try:
+            json_data = json.loads(data)
+        except:
+            return
+        qDebug(f'reply {get_timestamp()}')
         if status_code == 200 or status_code == 201:
             order_id = json_data['orderId']
             self.order_records.append(order_id)

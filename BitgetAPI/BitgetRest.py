@@ -49,7 +49,10 @@ class BitgetCommon(RestBase):
         self._delay_ms = delay
 
         data = reply.readAll().data()
-        json_data = json.loads(data.decode('utf-8'))
+        try:
+            json_data = json.loads(data.decode('utf-8'))
+        except:
+            return
         utc = int(json_data['data']['serverTime'])
         self.server_timestamp_base = utc + self.delay_ms
         reply.deleteLater()
