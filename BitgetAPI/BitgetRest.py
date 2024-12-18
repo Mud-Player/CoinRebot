@@ -1,4 +1,5 @@
 import json
+from typing import cast
 
 from PySide6.QtCore import qDebug, Slot, QDateTime
 from PySide6.QtNetwork import QNetworkRequest, QNetworkReply, QNetworkAccessManager
@@ -131,7 +132,7 @@ class BitgetOrder(RestOrderBase):
     def order_trigger_event(self):
         minimum_timestamp = self.trigger_timestamp
         reply = self._request('/api/v2/spot/trade/place-order', self.params, minimum_timestamp)
-        reply.finished.connect(lambda: self._on_replied(reply))
+        reply.finished.connect(self._on_replied)
 
     def cancel_order(self):
         pass
@@ -153,8 +154,8 @@ class BitgetOrder(RestOrderBase):
         reply = self.http_manager.post(request, body.encode())
         return reply
 
-    @Slot(QNetworkReply)
-    def _on_replied(self, reply):
+    def _on_replied(self):
+        reply = cast(QNetworkReply, self.sender())
         data = reply.readAll().data()
         json_data = json.loads(data)
         code = int(json_data['code'])
@@ -167,14 +168,17 @@ class BitgetOrder(RestOrderBase):
                 qDebug(f'挂单成功，结束任务：{str(self.params)}')
             self.succeed.emit()
         else:  # error
-            match code:
-                case 43009 | 40034 | 43012:
-                    self.stop_order_trigger()
-                    self.error_code = code
-                    qDebug(f'挂单失败: {json_data}')
-                    self.failed.emit()
-                case _:
-                    if not self.is_finished():
-                        qDebug(str(json_data))
-
             self.failed_count += 1
+            if self.order_type == RestOrderBase.OrderType.Sell and code == 43012: # Insufficient balance
+                qDebug(str(json_data))
+            else:
+                match code:
+                    case 43009 | 40034 | 43012:
+                        self.stop_order_trigger()
+                        self.error_code = code
+                        qDebug(f'挂单失败: {json_data}')
+                        self.failed.emit()
+                    case _:
+                        if not self.is_finished():
+                            qDebug(str(json_data))
+

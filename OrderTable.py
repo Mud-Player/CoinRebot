@@ -155,3 +155,7 @@ class OrderTableView(QtWidgets.QWidget):
         orders.pop(idx)
         table.removeRow(idx)
 
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        resize_header_to_contents(self.buy_table)
+        resize_header_to_contents(self.sell_table)

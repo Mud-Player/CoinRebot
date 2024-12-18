@@ -1,4 +1,5 @@
 import json
+from typing import cast
 
 from PySide6.QtCore import qDebug, Slot
 from PySide6.QtNetwork import QNetworkRequest, QNetworkReply, QNetworkAccessManager
@@ -138,7 +139,7 @@ class GateOrder(RestOrderBase):
     def order_trigger_event(self):
         minimum_timestamp = self.trigger_timestamp
         reply = self._request('/api/v4/spot/orders', self.params, minimum_timestamp)
-        reply.finished.connect(lambda: self._on_replied(reply))
+        reply.finished.connect(self._on_replied)
 
     def cancel_order(self):
         pass
@@ -161,8 +162,8 @@ class GateOrder(RestOrderBase):
         reply = self.http_manager.post(request, body.encode())
         return reply
 
-    @Slot(QNetworkReply)
-    def _on_replied(self, reply):
+    def _on_replied(self):
+        reply = cast(QNetworkReply, self.sender())
         status_code = reply.attribute(QNetworkRequest.Attribute.HttpStatusCodeAttribute)
         data = reply.readAll().data()
         json_data = json.loads(data)
@@ -176,15 +177,17 @@ class GateOrder(RestOrderBase):
                 qDebug(f'挂单成功，结束任务：{str(self.params)}')
             self.succeed.emit()
         else:
-            err_label = json_data['label']
-            self.error_code = 1
-            match err_label:
-                case 'INVALID_CURRENCY_PAIR' | 'BALANCE_NOT_ENOUGH':
-                    self.stop_order_trigger()
-                    qDebug(f'挂单失败: {json_data}')
-                    self.failed.emit()
-                case _:
-                    if not self.is_finished():
-                        qDebug(str(json_data))
-
             self.failed_count += 1
+            err_label = json_data['label']
+            if self.order_type == RestOrderBase.OrderType.Sell and err_label == 'BALANCE_NOT_ENOUGH': # Insufficient balance
+                qDebug(str(json_data))
+            else:
+                match err_label:
+                    case 'INVALID_CURRENCY_PAIR' | 'BALANCE_NOT_ENOUGH':
+                        self.error_code = 1
+                        self.stop_order_trigger()
+                        qDebug(f'挂单失败: {json_data}')
+                        self.failed.emit()
+                    case _:
+                        if not self.is_finished():
+                            qDebug(str(json_data))
